@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rechts-Navi: Die Quest – Atelier 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..900&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#E6EFE9; --surface:#FFFFFF; --ink:#13201B; --muted:#56655F;
+  --line:#0E5C43; --signal:#D93A24; --gold:#B87E00; --gold-bg:#FFF3D1; --rule:#CFDBD4;
+  --ok:#1A7443; --ok-bg:#E2F1E7; --bad:#B0301D; --bad-bg:#FBE6E1; --on-line:#FFFFFF;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1714; --surface:#18241F; --ink:#E6EEEA; --muted:#9AAAA3;
+    --line:#3AAE80; --signal:#FF6B53; --gold:#FFC53D; --gold-bg:#3A2E0E; --rule:#2B3A34;
+    --ok:#62CC91; --ok-bg:#15301F; --bad:#FF8670; --bad-bg:#3A1B15; --on-line:#0F1714;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1714; --surface:#18241F; --ink:#E6EEEA; --muted:#9AAAA3;
+  --line:#3AAE80; --signal:#FF6B53; --gold:#FFC53D; --gold-bg:#3A2E0E; --rule:#2B3A34;
+  --ok:#62CC91; --ok-bg:#15301F; --bad:#FF8670; --bad-bg:#3A1B15; --on-line:#0F1714;
+  color-scheme:dark;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+  font-size:1.0625rem;line-height:1.5;-webkit-text-size-adjust:100%}
+.wrap{max-width:42rem;margin:0 auto;padding:.5rem .75rem 2rem}
+h1,h2{font-family:Archivo,"Arial Narrow",Arial,sans-serif;font-stretch:112%;letter-spacing:-.01em}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--signal);outline-offset:3px;border-radius:4px}
+
+/* HUD */
+.hud{background:var(--surface);border:2px solid var(--rule);border-radius:14px 14px 0 0;border-bottom:0;
+  padding:.5rem .75rem;display:flex;align-items:center;gap:.75rem;justify-content:space-between}
+.stars{font-family:Archivo,Arial,sans-serif;font-weight:900;font-stretch:115%;font-size:1.15rem;color:var(--gold);white-space:nowrap}
+.stars.pop{animation:pop .45s ease}
+@keyframes pop{40%{transform:scale(1.35)}}
+.streak{font-size:.9rem;font-weight:700;color:var(--signal);flex:1}
+.inv{display:flex;gap:.3rem}
+.slot{width:2rem;height:2rem;border-radius:8px;border:2px dashed var(--rule);display:grid;place-items:center;font-size:1.15rem}
+.slot.full{border:2px solid var(--gold);background:var(--gold-bg)}
+.quest{background:var(--line);color:var(--on-line);padding:.45rem .75rem;font-weight:700;font-size:.95rem;line-height:1.3}
+.stage{position:relative;background:#22352B;line-height:0;border-left:2px solid var(--rule);border-right:2px solid var(--rule)}
+canvas{display:block;width:100%;touch-action:manipulation;image-rendering:auto}
+.hint{background:var(--surface);border:2px solid var(--rule);border-top:0;border-radius:0 0 14px 14px;padding:.5rem .75rem;min-height:2.6rem;font-size:.95rem}
+.hint b{color:var(--line)}
+
+/* Steuerung */
+.pad{display:flex;justify-content:space-between;align-items:center;margin-top:.9rem;gap:1rem;user-select:none;-webkit-user-select:none}
+.dpad{display:grid;grid-template-columns:repeat(3,3.4rem);grid-template-rows:repeat(3,3.4rem);gap:.25rem}
+.dpad button,.act{border:2px solid var(--rule);border-bottom-width:4px;background:var(--surface);border-radius:14px;font-size:1.4rem;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+.dpad button:active,.act:active{transform:translateY(2px);border-bottom-width:2px}
+.dpad .u{grid-area:1/2}.dpad .l{grid-area:2/1}.dpad .r{grid-area:2/3}.dpad .d{grid-area:3/2}
+.act{width:6.2rem;height:6.2rem;border-radius:50%;background:var(--line);color:var(--on-line);border-color:rgba(0,0,0,.25);font-size:1rem;font-weight:700}
+.keys{color:var(--muted);font-size:.9rem;margin:.9rem 0 0}
+
+/* Dialog */
+.dlg{position:fixed;inset:0;z-index:20;background:rgba(10,20,15,.55);display:none;overflow-y:auto;
+  padding:calc(env(safe-area-inset-top,0px) + .75rem) .75rem calc(env(safe-area-inset-bottom,0px) + .75rem)}
+.dlg.open{display:block}
+.panel{max-width:38rem;margin:0 auto;background:var(--bg);border-radius:20px;padding:1.1rem 1rem 1.25rem;border:3px solid var(--line);animation:fi .25s ease}
+@keyframes fi{from{opacity:0;transform:translateY(10px)}}
+.say{display:flex;gap:.7rem;align-items:flex-start;margin:0 0 .9rem}
+.say .av{flex:none;width:3.2rem;height:3.2rem;border-radius:50%;background:var(--surface);border:3px solid var(--line);display:grid;place-items:center;font-size:1.7rem}
+.say .bub{background:var(--surface);border-radius:4px 16px 16px 16px;padding:.7rem .95rem;flex:1;border:2px solid var(--rule)}
+.say .who{display:block;font-family:Archivo,Arial,sans-serif;font-weight:800;font-stretch:112%;font-size:.88rem;color:var(--line);margin-bottom:.15rem}
+.say.navi .av{border-color:var(--gold);background:var(--gold-bg)}
+.say.navi .who{color:var(--gold)}
+.say .bub p{margin:0 0 .5rem}.say .bub p:last-child{margin:0}
+.scene{border-radius:14px;padding:.8rem .95rem;margin:0 0 .9rem;background:var(--surface);border-left:6px solid var(--line)}
+.scene b{display:block;font-family:Archivo,Arial,sans-serif;font-stretch:115%;font-size:.82rem;color:var(--muted);margin-bottom:.2rem}
+.qmeta{font-size:.9rem;color:var(--muted);margin:0 0 .7rem}
+.asklbl{font-weight:700;margin:0 0 .55rem}
+.opts{display:grid;gap:.55rem;margin:0;padding:0;list-style:none}
+.opt{width:100%;text-align:left;display:flex;gap:.8rem;align-items:flex-start;padding:.8rem .95rem;min-height:3.1rem;
+  background:var(--surface);border:2px solid var(--rule);border-bottom-width:4px;border-radius:14px;cursor:pointer;line-height:1.35}
+.opt:hover:not([disabled]){border-color:var(--line)}
+.opt .k{flex:none;width:1.7rem;height:1.7rem;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:.9rem;background:var(--bg);color:var(--muted)}
+.opt[disabled]{cursor:default}
+.opt.right{border-color:var(--ok);background:var(--ok-bg)}.opt.right .k{background:var(--ok);color:var(--surface)}
+.opt.wrong{border-color:var(--bad);background:var(--bad-bg);animation:shake .35s}.opt.wrong .k{background:var(--bad);color:var(--surface)}
+.opt.dim{opacity:.5}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.fb{margin-top:1rem}
+.verdict{font-family:Archivo,Arial,sans-serif;font-weight:900;font-stretch:118%;font-size:1.2rem;margin:0 0 .3rem}
+.fb.ok .verdict{color:var(--ok)}.fb.no .verdict{color:var(--bad)}
+.ref{display:inline-block;margin-top:.15rem;padding:.2rem .65rem;border-radius:6px;background:var(--bg);font-weight:700;font-size:.95rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;min-height:3.1rem;padding:.7rem 1.4rem;border-radius:14px;border:0;border-bottom:4px solid rgba(0,0,0,.25);cursor:pointer;
+  background:var(--line);color:var(--on-line);font-weight:700;font-size:1.05rem}
+.btn:active{transform:translateY(2px);border-bottom-width:2px}
+.btn.ghost{background:var(--surface);color:var(--line);border:2px solid var(--line);border-bottom-width:4px}
+.row{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:1.1rem}
+.title h1{font-size:clamp(2.3rem,10vw,3.4rem);line-height:.93;font-weight:900;font-stretch:125%;margin:.2rem 0 .2rem;color:var(--line)}
+.title .sub{margin:0 0 1rem;color:var(--muted);font-weight:700}
+.namebox label{display:block;font-weight:700;margin-bottom:.35rem}
+.namebox input{width:100%;max-width:20rem;min-height:3rem;padding:.6rem .9rem;border-radius:12px;border:2px solid var(--rule);background:var(--surface)}
+.howto{margin:.9rem 0 0;padding:0;list-style:none;font-size:.97rem}
+.howto li{padding:.35rem 0;border-top:1px solid var(--rule)}
+kbd{font-family:inherit;font-weight:700;background:var(--surface);border:2px solid var(--rule);border-bottom-width:3px;border-radius:6px;padding:0 .4rem}
+.loot{text-align:center;margin:.5rem 0 1rem}
+.loot .item{font-size:4.5rem;line-height:1;display:inline-block;animation:loot .8s cubic-bezier(.2,1.6,.4,1)}
+@keyframes loot{from{transform:scale(0) rotate(-30deg)}to{transform:scale(1) rotate(0)}}
+.loot .iname{font-family:Archivo,Arial,sans-serif;font-weight:900;font-stretch:118%;font-size:1.3rem;margin:.4rem 0 0}
+.big{font-family:Archivo,Arial,sans-serif;font-weight:900;font-stretch:125%;font-size:clamp(2.6rem,12vw,3.8rem);line-height:1;color:var(--gold);margin:.25rem 0}
+.big small{font-size:.38em;color:var(--muted);font-weight:700}
+.rank{font-family:Archivo,Arial,sans-serif;font-weight:900;font-stretch:120%;font-size:1.5rem;color:var(--line);margin:.25rem 0 .75rem}
+.bars{list-style:none;margin:1rem 0;padding:0;display:grid;gap:.8rem}
+.bars li{display:grid;grid-template-columns:auto 1fr auto;gap:.2rem .6rem;align-items:center}
+.bars .ic{font-size:1.4rem;grid-row:span 2}
+.bars .bar{grid-column:2/-1;height:10px;border-radius:5px;background:var(--rule);overflow:hidden}
+.bars .bar i{display:block;height:100%;background:var(--line)}
+.bars li.weak .bar i{background:var(--signal)}
+.bars .lbl{font-weight:700}
+.note{background:var(--surface);border-radius:14px;padding:.9rem 1rem;margin-top:1rem;border:2px dashed var(--rule)}
+.note p{margin:0 0 .4rem}.note p:last-child{margin:0}
+.fbk{background:var(--surface);border-radius:14px;padding:.9rem 1rem;margin-top:1rem;border-left:6px solid var(--ok)}
+.fbk.pot{border-left-color:var(--signal)}
+.fbk h2{font-size:1.1rem;font-weight:900;margin:0 0 .5rem}
+.fbk ul{margin:0;padding:0;list-style:none;display:grid;gap:.65rem}
+.fbk li b{display:block}
+.fbk li span{display:block;font-size:.95rem;color:var(--muted)}
+.fbk li em{font-style:normal;font-weight:700;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud">
+    <span class="stars" id="stars" aria-live="polite">⭐ 0</span>
+    <span class="streak" id="streak"></span>
+    <span class="inv" id="inv" aria-label="Inventar"></span>
+  </div>
+  <div class="quest" id="quest" aria-live="polite">Quest</div>
+  <div class="stage"><canvas id="cv" aria-label="Spielfeld: Bewegen Sie die Figur mit den Pfeiltasten"></canvas></div>
+  <div class="hint" id="hint"></div>
+  <div class="pad">
+    <div class="dpad" aria-label="Steuerkreuz">
+      <button class="u" data-d="up" aria-label="hoch">▲</button>
+      <button class="l" data-d="left" aria-label="links">◀</button>
+      <button class="r" data-d="right" aria-label="rechts">▶</button>
+      <button class="d" data-d="down" aria-label="runter">▼</button>
+    </div>
+    <button class="act" id="act">Sprechen</button>
+  </div>
+  <p class="keys">Tastatur: <kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> oder <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> zum Laufen, <kbd>Leertaste</kbd> zum Sprechen.</p>
+</div>
+<div class="dlg" id="dlg" role="dialog" aria-modal="true"><div class="panel" id="panel"></div></div>
+
+<script>
+/* ================= Inhalte ================= */
+const NAVI="🧭";
+const PLACES=[
+  {name:"Rathausplatz",icon:"🏛️",item:"🗝️",iname:"Schlüssel der Rechtsordnung",chap:"Kapitel 2.1 und 2.2"},
+  {name:"Shoppingcenter",icon:"🛍️",item:"🪪",iname:"Ausweis der Handlungsfähigkeit",chap:"Kapitel 2.3 und 2.4"},
+  {name:"Lehrbetrieb",icon:"🏭",item:"📜",iname:"Siegel des Lehrvertrags",chap:"Kapitel 2.5 und 2.6"},
+  {name:"Pausenraum",icon:"☕",item:"🤝",iname:"Karte der Konfliktlösung",chap:"Kapitel 2.6 und 2.7"}
+];
+const RF=["Richtig","Falsch"], REGEL=["Rechtliche Regel","Betriebliche oder gesellschaftliche Regel","Moralische Vorstellung"];
+// a = Index der richtigen Antwort; fix = Reihenfolge nicht mischen
+const NPCS=[
+/* ---------- Rathausplatz ---------- */
+{z:0,x:5,y:16,av:"🧑",name:"Stadtführer Jonas",qs:[
+ {c:"Lernende sind gegenüber dem Lehrbetrieb die schwächere Seite. Das Gesetz schreibt deshalb vor, dass der Betrieb ihre Gesundheit schützen muss.",
+  q:"Welche Funktion des Rechts zeigt sich hier?",opts:["Schutz","Ordnung","Sicherheit","Konfliktlösung"],a:0,
+  why:"Das Recht schützt die schwächere Seite: Lernende gegenüber dem Betrieb, Mieterinnen gegenüber Vermietern, Kundinnen gegenüber grossen Firmen."},
+ {q:"Die Schweiz ist ein Rechtsstaat. Was bedeutet das?",opts:["Alle sind an das Recht gebunden, auch die Mächtigen.","Der Staat darf alles bestimmen.","Jede Person hat immer recht.","Nur Richterinnen und Richter müssen sich an Gesetze halten."],a:0,
+  why:"In einem Rechtsstaat gelten die Regeln für alle, auch für jene, die Geld, Macht und Einfluss haben. Auch der Staat selbst muss sich an das Recht halten."}]},
+{z:0,x:11,y:16,av:"👵",name:"Frau Huber",qs:[
+ {c:"Noah bietet im Tram einer älteren Person seinen Sitzplatz nicht an.",
+  q:"Welche Art von Regel verletzt Noah?",fix:true,opts:REGEL,a:2,
+  why:"Die Regel steht in keinem Gesetz und in keinem Vertrag. Eine rechtliche Folge hat Noah nicht zu erwarten, höchstens böse Blicke (soziale Sanktion)."},
+ {q:"Recht, Moral, Ethik: Welche Frage stellt die Ethik?",opts:["Warum ist das richtig, und ist es gerecht?","Was gilt?","Was gehört sich?","Wer bezahlt die Busse?"],a:0,
+  why:"Das Recht fragt: Was gilt? Die Moral fragt: Was gehört sich? Die Ethik denkt über beides nach und fragt nach den Gründen. Sie ist die Grundlage, um Regeln zu verändern."}]},
+{z:0,x:3,y:19,av:"👷",name:"Sam, Lernender Logistik",qs:[
+ {c:"In Ihrem Lehrbetrieb gilt: Während der Arbeit bleibt das Handy im Spind.",
+  q:"Welche Art von Regel ist das?",fix:true,opts:REGEL,a:1,
+  why:"Der Betrieb hat die Regel festgelegt. Sie gilt in dieser Organisation und stützt sich auf den Lehrvertrag. Ein Verstoss kann deshalb trotzdem eine rechtliche Folge haben, zum Beispiel eine Verwarnung."},
+ {c:"Elira sagt: «Diese Regel ist unfair, also gilt sie auch nicht.»",
+  q:"Stimmt Eliras Aussage?",fix:true,opts:RF,a:1,
+  why:"Ob eine Regel gilt, ist eine rechtliche Frage: Steht sie in einem Gesetz, einem Vertrag oder einer Weisung? Ob sie gerecht ist, ist eine Frage der Moral. Eine Regel kann gelten, obwohl viele sie unfair finden. Ändern kann man sie über die Politik."}]},
+{z:0,x:12,y:20,av:"👮",name:"Polizist Brunner",qs:[
+ {c:"Luca fährt mit dem Velo über Rot. Die Polizei büsst ihn.",
+  q:"Welcher Rechtsbereich ist betroffen?",fix:true,opts:["Öffentliches Recht","Privates Recht"],a:0,
+  why:"Der Staat steht Luca gegenüber und handelt mit hoheitlicher Macht: Er büsst."},
+ {c:"Leilas neues Smartphone ist nach zwei Tagen kaputt. Sie verlangt vom Geschäft ein neues Gerät.",
+  q:"Welcher Rechtsbereich ist betroffen?",fix:true,opts:["Öffentliches Recht","Privates Recht"],a:1,
+  why:"Leila und das Geschäft stehen sich auf Augenhöhe gegenüber. Es geht um einen Kaufvertrag. Der Staat mischt sich erst ein, wenn der Fall vor Gericht kommt."}]},
+{z:0,x:8,y:15,av:"🎩",name:"Gemeindeschreiber Vogt",qs:[
+ {
+  q:"Die Schweizer Rechtsordnung hat drei Stufen. Welche Reihenfolge stimmt, wenn Sie mit der grundlegendsten Regel beginnen, auf der alle anderen aufbauen?",opts:["Verfassung, Gesetz, Verordnung","Gesetz, Verfassung, Verordnung","Verordnung, Gesetz, Verfassung","Verfassung, Verordnung, Gesetz"],a:0,
+  why:"Die Verfassung ist die Grundlage für alles: Sie legt fest, wie der Staat aufgebaut ist, und garantiert die Grundrechte. Die Gesetze regeln einzelne Bereiche genauer. Die Verordnungen bestimmen, wie ein Gesetz im Detail umgesetzt wird. Keine Regel darf der Stufe widersprechen, auf der sie aufbaut."},
+ {c:"Sie lösen einen Fall und wollen belegen, wo die Regel steht: im Obligationenrecht, Artikel 345a, Absatz 1.",
+  q:"Wie zitieren Sie diese Fundstelle korrekt?",opts:["Art. 345a Abs. 1 OR","OR, Seite 345","Gesetz Nr. 345a, 1. Zeile","Obligationenrecht, Kapitel 345a"],a:0,
+  why:"Zu einer Fundstelle gehören der Artikel, bei Bedarf der Absatz und die Abkürzung des Gesetzes. So findet jede Person die Stelle in Sekunden. In diesem Atelier gilt: Jede rechtliche Antwort braucht eine Fundstelle."}]},
+
+/* ---------- Shoppingcenter ---------- */
+{z:1,x:20,y:17,av:"👵",name:"Milas Grossmutter",qs:[
+ {c:"Mila ist drei Monate alt. Ihre Grossmutter schenkt ihr 2000 Franken.",
+  q:"Kann Mila das Geld besitzen?",opts:["Ja, jeder Mensch ist rechtsfähig.","Nein, erst ab 18 Jahren.","Nein, erst wenn sie urteilsfähig ist.","Nur wenn ein Gericht zustimmt."],a:0,
+  why:"Rechtsfähig ist jeder Mensch, von der Geburt bis zum Tod. Mila wird Eigentümerin. Über das Geld verfügen dürfen aber nur ihre Eltern als gesetzliche Vertretung.",ref:"Art. 11 ZGB"},
+ {c:"Aron ist 15. Er versteht, was es bedeutet, mit seinem eigenen Geld ein T-Shirt für 40 Franken zu kaufen.",
+  q:"Welche Aussage über Aron stimmt?",opts:["Er ist rechtsfähig und urteilsfähig, aber nicht voll handlungsfähig.","Er ist voll handlungsfähig.","Er ist nicht rechtsfähig.","Er ist nicht urteilsfähig, weil er unter 16 ist."],a:0,
+  why:"Aron ist rechtsfähig wie jeder Mensch und in dieser Situation urteilsfähig. Voll handlungsfähig ist er nicht, weil er minderjährig ist. Er ist beschränkt handlungsfähig.",ref:"Art. 11, Art. 16 und Art. 19 ZGB"}]},
+{z:1,x:23,y:20,av:"🧑",name:"Amir",qs:[
+ {c:"Ein Kollege sagt: «Urteilsfähig ist man ab 16 Jahren.»",
+  q:"Stimmt diese Aussage?",fix:true,opts:RF,a:1,
+  why:"Das Gesetz nennt für die Urteilsfähigkeit kein Alter. Es kommt auf die Situation an: Versteht die Person, was sie tut und welche Folgen es hat? Dieselbe Person kann am Morgen urteilsfähig sein und am Abend nach fünf Bier nicht.",ref:"Art. 16 ZGB"},
+ {c:"«Meine Schwester ist 17 und möchte etwas Wichtiges unterschreiben. Sie sagt, sie verstehe alles. Unsere Eltern sind dagegen.» Mehr wissen Sie nicht.",
+  q:"Darf die Schwester allein unterschreiben?",opts:["Nicht bestimmbar: Es fehlt, um welches Geschäft es geht.","Ja, weil sie alles versteht.","Nein, unter 18 darf man nie unterschreiben.","Ja, weil sie fast volljährig ist."],a:0,
+  why:"Die Schwester ist beschränkt handlungsfähig. Ob sie allein unterschreiben darf, hängt vom Geschäft ab: Ein Kauf vom eigenen Lohn ginge allein, eine Verpflichtung mit Laufzeit oder hohem Betrag nur mit Zustimmung. Eine gute Falllösung sagt, wenn eine Information fehlt.",ref:"Art. 19 ZGB"}]},
+{z:1,x:21,y:15,av:"🧔",name:"Verkäufer Marco",qs:[
+ {q:"Wer ist voll handlungsfähig?",opts:["Wer volljährig und urteilsfähig ist","Wer volljährig ist","Wer urteilsfähig ist","Wer einen eigenen Lohn verdient"],a:0,
+  why:"Es braucht beides: Volljährigkeit und Urteilsfähigkeit. Wer mit 17 alles versteht, ist noch nicht voll handlungsfähig. Wer mit 30 betrunken ist, in diesem Moment auch nicht.",ref:"Art. 13, Art. 14 und Art. 16 ZGB"},
+ {c:"Eine Kundin legt ein Sandwich auf das Band, bezahlt und geht. Niemand sagt ein Wort.",
+  q:"Ist ein Vertrag zustande gekommen?",opts:["Ja, ein Vertrag kann auch stillschweigend entstehen.","Nein, es wurde nichts unterschrieben.","Nein, es wurde nichts gesagt.","Nur, wenn die Kundin die Quittung behält."],a:0,
+  why:"Ein Vertrag kommt zustande, wenn sich zwei Seiten einig sind. Das geht mündlich, schriftlich oder stillschweigend. Die meisten Verträge brauchen keine bestimmte Form.",ref:"Art. 1 und Art. 11 OR"}]},
+{z:1,x:29,y:15,av:"👩",name:"Autohändlerin Frey",qs:[
+ {c:"David ist 30. Im Vollrausch unterschreibt er einen Kaufvertrag für ein teures Auto.",
+  q:"Was gilt für diesen Vertrag?",opts:["Er ist nichtig.","Er ist gültig, weil David volljährig ist.","Er ist gültig, wenn David ihn nicht innert einer Woche kündigt.","Er braucht die Zustimmung von Davids Eltern."],a:0,
+  why:"Im Vollrausch ist David nicht urteilsfähig und damit nicht handlungsfähig. Was in diesem Zustand unterschrieben wird, ist von Anfang an unwirksam.",ref:"Art. 17 und Art. 18 ZGB"},
+ {c:"Yassin ist 16. Ohne Wissen seiner Eltern bestellt er ein Smartphone für 1200 Franken auf Rechnung.",
+  q:"Ist der Kaufvertrag gültig?",opts:["Noch nicht: Es braucht die Zustimmung der Eltern.","Ja, weil Yassin urteilsfähig ist.","Ja, weil online bestellt wurde.","Nein, Yassin ist nicht rechtsfähig."],a:0,
+  why:"1200 Franken auf Rechnung sind viel mehr als ein Alltagsgeschäft. Als beschränkt handlungsfähige Person braucht Yassin die Zustimmung der gesetzlichen Vertretung. Sie kann vorher oder nachher erfolgen.",ref:"Art. 19 ZGB"}]},
+{z:1,x:29,y:20,av:"🎧",name:"Jamie",qs:[
+ {c:"Jamie ist 17 und urteilsfähig. Sie kauft von ihrem Lehrlingslohn Kopfhörer für 80 Franken.",
+  q:"Darf Jamie das ohne ihre Eltern?",opts:["Ja, über ihren Arbeitslohn darf sie selbst verfügen.","Nein, unter 18 braucht es immer die Zustimmung.","Nein, sie ist noch nicht rechtsfähig.","Nur wenn der Lehrbetrieb einverstanden ist."],a:0,
+  why:"Jamie ist beschränkt handlungsfähig. Kleine Alltagsgeschäfte und Käufe mit dem eigenen Lohn darf sie allein abschliessen.",ref:"Art. 19 und Art. 323 ZGB"},
+ {c:"Jamies Freundin Selin ist 17 und urteilsfähig. Sie will einen Handyvertrag mit 24 Monaten Laufzeit abschliessen.",
+  q:"Was gilt für Selin?",opts:["Sie braucht die Zustimmung ihrer Eltern.","Sie darf allein entscheiden, weil sie urteilsfähig ist.","Der Vertrag ist nichtig, egal was die Eltern sagen.","Sie darf ihn abschliessen, wenn der Anbieter einverstanden ist."],a:0,
+  why:"Ein Vertrag, der Selin zwei Jahre lang jeden Monat verpflichtet, ist ein wichtiges Rechtsgeschäft. Dafür braucht sie die Zustimmung der gesetzlichen Vertretung, vorher oder nachher.",ref:"Art. 19 ZGB"}]},
+
+/* ---------- Lehrbetrieb ---------- */
+{z:2,x:27,y:8,av:"🗂️",name:"Herr Keller, Lehraufsicht",qs:[
+ {q:"Welche Aussage zum Lehrvertrag stimmt?",opts:["Er muss schriftlich sein und vom Kanton genehmigt werden.","Ein Handschlag genügt, wie bei den meisten Verträgen.","Er gilt, sobald die lernende Person unterschrieben hat.","Er muss bei einer Notarin beglaubigt werden."],a:0,
+  why:"Die meisten Verträge sind formfrei (Art. 11 OR). Für den Lehrvertrag verlangt das Gesetz aber die Schriftform. In Basel-Stadt genehmigt ihn die Fachstelle Lehraufsicht.",ref:"Art. 344a OR, Art. 14 BBG"},
+ {q:"In welchem Gesetz finden Sie die Regeln zu Probezeit, Lohn, Ferien und Pflichten im Lehrverhältnis?",opts:["Obligationenrecht (OR)","Strafgesetzbuch (StGB)","Bundesverfassung (BV)","Strassenverkehrsgesetz (SVG)"],a:0,
+  why:"Der Lehrvertrag ist ein besonderer Arbeitsvertrag. Das OR regelt, was zwischen Ihnen und dem Betrieb gilt. Das BBG regelt die Organisation der Berufsbildung.",ref:"Art. 344 bis Art. 346a OR"}]},
+{z:2,x:22,y:4,av:"👩",name:"Nora",qs:[
+ {c:"Nora ist 17. Sie schliesst einen Lehrvertrag mit dem Kinderhaus Rheinblick ab.",
+  q:"Wer unterschreibt den Lehrvertrag?",opts:["Der Betrieb, Nora und ihre gesetzliche Vertretung","Nur der Betrieb und Nora","Nur der Betrieb und Noras Eltern","Nur Nora"],a:0,
+  why:"Vertragsparteien sind der Betrieb und Nora. Weil Nora minderjährig ist, unterschreibt ihre gesetzliche Vertretung zusätzlich mit."},
+ {c:"Nora möchte einen Freikurs an der Berufsfachschule besuchen. Der Betrieb sagt: «Dann ziehen wir dir diese Stunden vom Lohn ab.»",
+  q:"Darf der Betrieb das?",opts:["Nein, der Besuch ist ohne Lohnabzug zu gestatten.","Ja, Freikurse sind Freizeit.","Ja, wenn es im Betrieb so üblich ist.","Nur im ersten Lehrjahr nicht."],a:0,
+  why:"Lernende haben Anspruch auf Stütz- und Freikurse. Der Besuch ist ohne Lohnabzug zu gestatten, bis zu einem halben Tag pro Woche während der Arbeitszeit.",ref:"Art. 22 BBG, Art. 20 BBV"}]},
+{z:2,x:26,y:4,av:"👩‍💼",name:"Berufsbildnerin Meier",qs:[
+ {q:"Wie lange dauert die Probezeit in der Lehre?",opts:["Mindestens 1, höchstens 3 Monate","Immer genau 3 Monate","Höchstens 2 Wochen","Das ganze erste Lehrjahr"],a:0,
+  why:"Die genaue Dauer steht im Lehrvertrag. Sie muss zwischen einem und drei Monaten liegen.",ref:"Art. 344a OR"},
+ {q:"Wie viele Wochen Ferien pro Jahr haben Lernende bis zum vollendeten 20. Altersjahr mindestens?",opts:["5 Wochen","4 Wochen","6 Wochen","3 Wochen"],a:0,
+  why:"Bis zum vollendeten 20. Altersjahr gilt ein Anspruch von mindestens fünf Wochen. Ein Lehrvertrag darf mehr geben, aber nicht weniger.",ref:"Art. 329a OR"}]},
+{z:2,x:31,y:6,av:"🙋",name:"Mia",qs:[
+ {c:"Mia sagt: «Wenn im Lehrvertrag nichts dazu steht, gibt es auch keine Regel.»",
+  q:"Stimmt Mias Aussage?",fix:true,opts:RF,a:1,
+  why:"Der Lehrvertrag regelt nur, was für Sie persönlich vereinbart ist. Alles andere steht im Gesetz (OR, BBG, Arbeitsgesetz). Das Gesetz gilt auch dann, wenn der Vertrag es nicht erwähnt."},
+ {c:"Mia lässt aus Unachtsamkeit ein teures Messgerät fallen. Es ist kaputt.",
+  q:"Muss Mia für den Schaden haften?",opts:["Grundsätzlich ja, aber Berufsrisiko und Ausbildungsstand werden berücksichtigt.","Nein, Lernende haften nie.","Ja, immer für den vollen Betrag.","Nur, wenn die Eltern eine Versicherung haben."],a:0,
+  why:"Lernende haften für Schäden, die sie absichtlich oder fahrlässig verursachen. Dabei zählt aber, wie riskant die Arbeit ist und wie weit die Ausbildung ist. Von Lernenden im ersten Lehrjahr wird weniger erwartet als von Profis.",ref:"Art. 321e OR"}]},
+{z:2,x:20,y:9,av:"🧽",name:"Elia",qs:[
+ {c:"Elia muss jede Woche mehrere Stunden das Privatauto seines Chefs waschen. Mit seinem Beruf hat das nichts zu tun. Der Chef sagt: «Was hier gilt, entscheide ich.»",
+  q:"Wer hat recht?",opts:["Elia: Der Betrieb muss ihn fachgemäss ausbilden.","Der Chef: Er hat das Weisungsrecht.","Der Chef: Lernende müssen jede Arbeit erledigen.","Niemand, weil es nicht im Lehrvertrag steht."],a:0,
+  why:"Der Betrieb darf Weisungen erteilen, aber nur im Rahmen von Vertrag und Gesetz. Er muss Lernende fachgemäss ausbilden. Wer Lernende regelmässig für berufsfremde Arbeiten einsetzt, verletzt diese Pflicht.",ref:"Art. 321d OR, Art. 345a OR"},
+ {c:"Im Lager sind Sicherheitsschuhe Pflicht. Sam trägt Turnschuhe, weil die Sicherheitsschuhe drücken. Der Berufsbildner schickt ihn nach Hause, um die Schuhe zu holen.",
+  q:"Wie ist der Fall zu beurteilen?",opts:["Sam muss die Weisung befolgen. Drückende Schuhe muss der Betrieb aber ersetzen.","Sam darf selbst entscheiden, was er an den Füssen trägt.","Der Betrieb darf keine Kleidung vorschreiben.","Sam muss neue Sicherheitsschuhe selbst bezahlen."],a:0,
+  why:"Der Betrieb muss die Gesundheit der Lernenden schützen, also Schutzausrüstung vorschreiben und bereitstellen. Sam muss Anweisungen befolgen. Bei der Regel hat der Berufsbildner recht, bei den drückenden Schuhen Sam.",ref:"Art. 328 OR, Art. 321d OR"}]},
+
+/* ---------- Pausenraum ---------- */
+{z:3,x:12,y:3,av:"✈️",name:"Malik",qs:[
+ {c:"Malik will im Juli zwei Wochen Ferien, weil seine Familie verreist. Der Betrieb lehnt ab: Im Juli fehlen schon drei Mitarbeitende.",
+  q:"Wer bestimmt den Zeitpunkt der Ferien?",opts:["Der Betrieb, mit Rücksicht auf Maliks Wünsche","Malik, denn es sind seine Ferien","Maliks Eltern","Die Berufsfachschule"],a:0,
+  why:"Der Betrieb bestimmt den Zeitpunkt. Er muss aber auf die Wünsche Rücksicht nehmen, soweit es betrieblich möglich ist. Eine Ablehnung sollte er begründen und einen anderen Zeitpunkt anbieten.",ref:"Art. 329c OR"},
+ {c:"Malik will im Gespräch überzeugend argumentieren und nutzt das 3-B-Modell.",
+  q:"Wofür stehen die drei B?",opts:["Behauptung, Begründung, Beispiel","Bitte, Befehl, Beschwerde","Betrieb, Berufsbildner, Berufsfachschule","Beobachten, Bewerten, Beenden"],a:0,
+  why:"Zuerst die eigene Meinung klar äussern (Behauptung), dann das Warum erklären (Begründung, oft mit «weil») und schliesslich einen konkreten Beweis anfügen (Beispiel)."}]},
+{z:3,x:9,y:6,av:"😟",name:"Aylin",qs:[
+ {c:"Aylin ist seit zwei Monaten in der Lehre, noch in der Probezeit. Nach einem Streit sagt der Berufsbildner: «Wir können das Lehrverhältnis jederzeit sofort beenden.»",
+  q:"Stimmt das?",opts:["Teilweise: Kündigen geht, aber mit 7 Tagen Frist.","Ja, in der Probezeit gibt es keine Frist.","Nein, ein Lehrvertrag kann gar nie gekündigt werden.","Nein, in der Probezeit darf nur Aylin kündigen."],a:0,
+  why:"In der Probezeit können beide Seiten das Lehrverhältnis ohne Begründung auflösen, aber mit einer Frist von sieben Tagen. «Sofort» stimmt also nicht.",ref:"Art. 344a OR, Art. 346 OR"},
+ {c:"Ein Jahr später: Aylins Probezeit ist längst vorbei. Nach einem schlechten Monat will der Betrieb ihr ordentlich kündigen.",
+  q:"Geht das?",opts:["Nein, nur im gegenseitigen Einverständnis oder aus wichtigen Gründen.","Ja, mit 7 Tagen Frist wie in der Probezeit.","Ja, mit einem Monat Kündigungsfrist.","Ja, wenn die Berufsfachschule zustimmt."],a:0,
+  why:"Nach der Probezeit ist der Lehrvertrag nicht mehr ordentlich kündbar. Eine vorzeitige Auflösung gibt es nur, wenn beide einverstanden sind oder wenn wichtige Gründe vorliegen.",ref:"Art. 346 OR"}]},
+{z:3,x:13,y:6,av:"🤒",name:"Sofia",qs:[
+ {c:"Sofia war gestern krank. Heute verlangt der Berufsbildner ein Arztzeugnis und will wissen, welche Krankheit sie hatte.",
+  q:"Was darf der Betrieb verlangen?",opts:["Ein Arztzeugnis ja, die Diagnose nein","Arztzeugnis und Diagnose","Weder Arztzeugnis noch Diagnose","Nur die Diagnose, aber kein Arztzeugnis"],a:0,
+  why:"Der Betrieb darf ein Arztzeugnis verlangen; ab welchem Tag, regelt er selbst. Gesundheitsdaten wie die Diagnose sind aber geschützt.",ref:"Art. 328b OR"},
+ {c:"Sofia ist im ersten Lehrjahr und fällt wegen einer Grippe eine ganze Woche aus. Sie hat sich korrekt abgemeldet.",
+  q:"Was gilt für ihren Lohn?",opts:["Er wird weiterbezahlt.","Für die Krankheitstage gibt es keinen Lohn.","Sie muss die Woche in den Ferien nachholen.","Lohn gibt es nur mit Zustimmung der Eltern."],a:0,
+  why:"Wer krank ist, meldet sich sofort ab und ist von der Arbeit befreit. Der Lohn wird weiterbezahlt, im ersten Lehrjahr mindestens drei Wochen lang.",ref:"Art. 324a OR"}]},
+{z:3,x:7,y:2,av:"📝",name:"Lea",qs:[
+ {c:"Lea bereitet ein Gespräch vor und notiert: «Mein Chef nutzt mich aus.»",
+  q:"Ist dieser Satz eine Tatsache oder eine Bewertung?",fix:true,opts:["Tatsache","Bewertung"],a:1,
+  why:"Eine Bewertung ist eine Meinung über eine Tatsache. Ein Gespräch beginnen Sie besser mit einer Tatsache, die man prüfen kann: «Ich musste diese Woche dreimal länger arbeiten.»"},
+ {q:"Welcher Satz ist eine Ich-Botschaft?",opts:["«Das hat mich gestresst, weil ich den Zug verpasst habe.»","«Sie geben mir immer zu viel Arbeit.»","«Jeder weiss, dass das unfair ist.»","«Sie hören mir nie zu.»"],a:0,
+  why:"Eine Ich-Botschaft spricht von der eigenen Wahrnehmung statt von Vorwürfen. Sätze mit «Sie haben immer …» oder «Jeder weiss …» zwingen die andere Seite in die Verteidigung."}]},
+{z:3,x:6,y:9,av:"💸",name:"Luca",qs:[
+ {c:"Auf Lucas Lohnabrechnung fehlen 150 Franken gegenüber dem Lehrvertrag. Er hat nachgefragt, der Vorgesetzte hat ihn vertröstet. Zwei Wochen sind vergangen.",
+  q:"Was ist der beste nächste Schritt?",opts:["Ein Gespräch verlangen: Tatsache nennen, Lehrvertrag zeigen, Lösung vorschlagen","Ab sofort nur noch halb so viel arbeiten","Nichts sagen, um keinen Streit zu riskieren","Den Betrieb in einer Story auf Social Media blossstellen"],a:0,
+  why:"Luca ist im Recht: Der vereinbarte Lohn ist geschuldet. Er bereitet das Gespräch vor (Tatsache, Position, Grundlage, Vorschlag) und bittet um einen festen Termin. Nützt das nichts, holt er Unterstützung bei der Lehrperson oder der Lehraufsicht.",ref:"Art. 322 OR"},
+ {c:"Lucas Kollegin Jelena ist 17. Die Berufsbildnerin verlangt, dass sie diese Woche an zwei Abenden länger bleibt, weil viel zu tun ist.",
+  q:"Was gilt?",opts:["Erlaubt, wenn nötig und zumutbar, mit Ausgleich und höchstens 9 Stunden pro Tag","Verboten, Lernende leisten nie Überstunden","Erlaubt, egal wie lange, wegen des Weisungsrechts","Nur erlaubt, wenn Jelenas Eltern zustimmen"],a:0,
+  why:"Überstunden darf der Betrieb verlangen, wenn sie nötig und zumutbar sind. Sie werden mit Freizeit oder Zuschlag ausgeglichen. Für Jugendliche unter 18 gilt höchstens neun Stunden Arbeit pro Tag.",ref:"Art. 321c OR, Art. 31 ArG"}]}
+];
+const TOTAL=NPCS.reduce((s,n)=>s+n.qs.length,0);
+const RANKS=[[0,"Rechts-Neuling","Sie sind losgelaufen. Jetzt heisst es: Kapitel repetieren und nochmals los."],
+ [20,"Paragraphen-Spürnase","Sie finden sich zurecht, aber auf einigen Wegen verlaufen Sie sich noch."],
+ [30,"Rechts-Profi","Stark! Nur wenige Fallen haben Sie erwischt."],
+ [37,"Meisterin oder Meister des Rechts-Navis","Fast fehlerfrei. Die Stadt ist in sicheren Händen."]];
+const OK_LINES=["Richtig!","Genau so!","Volltreffer!","Stark!","Sauber gelöst!"], NO_LINES=["Nicht ganz.","Knapp daneben.","Das war eine Falle."];
+const KEYS=["A","B","C","D"];
+// Themen für das Schlussfeedback: [Titel, Kapitel, Lerntipp]
+const TOPICS=[
+ ["Funktionen des Rechts und Rechtsstaat","Kapitel 2.1","Lernen Sie die fünf Funktionen des Rechts mit je einem eigenen Beispiel."],
+ ["Recht, Moral und Ethik unterscheiden","Kapitel 2.1 und 2.2","Üben Sie den Drei-Fragen-Test: Steht die Regel in Gesetz oder Vertrag, hat der Betrieb sie festgelegt, oder erwarten andere sie einfach?"],
+ ["Öffentliches und privates Recht","Kapitel 2.2","Faustregel: Steht der Staat mit seiner Macht einer Person gegenüber, ist es öffentliches Recht. Stehen sich zwei auf Augenhöhe gegenüber, ist es privates Recht."],
+ ["Stufen der Rechtsordnung und Artikel zitieren","Kapitel 2.2","Merken Sie sich die Reihenfolge Verfassung, Gesetz, Verordnung und üben Sie das Zitieren nach dem Muster «Art. 16 ZGB»."],
+ ["Rechts-, Urteils- und Handlungsfähigkeit","Kapitel 2.3","Zeichnen Sie das Schema auf: rechtsfähig, urteilsfähig, volljährig, handlungsfähig, je mit Artikel."],
+ ["Was Minderjährige allein dürfen","Kapitel 2.4","Gehen Sie den Entscheidbaum durch: Urteilsfähig? Volljährig? Um welches Geschäft geht es?"],
+ ["Wie ein Vertrag zustande kommt","Kapitel 2.4","Wiederholen Sie die drei Bedingungen für einen gültigen Vertrag und die Formfreiheit."],
+ ["Lehrvertrag: Form und gesetzliche Grundlagen","Kapitel 2.5","Prägen Sie sich den Suchweg ein: zuerst Lehrvertrag, dann OR und BBG, dann Lehraufsicht."],
+ ["Probezeit, Ferien und Freikurse","Kapitel 2.5","Lernen Sie die Eckwerte: 1 bis 3 Monate Probezeit, 5 Wochen Ferien, Freikurse ohne Lohnabzug."],
+ ["Pflichten, Weisungsrecht und Haftung","Kapitel 2.5 und 2.6","Lesen Sie die Übersicht «Das steht im Gesetz» zu den Pflichten beider Seiten nochmals durch."],
+ ["Ferien, Überstunden, Krankheit und Lohn","Kapitel 2.6","Repetieren Sie die sechs Konfliktfelder mit den passenden Artikeln."],
+ ["Probezeit und Auflösung des Lehrvertrags","Kapitel 2.6","Unterscheiden Sie: in der Probezeit 7 Tage Frist, danach nur im Einverständnis oder aus wichtigen Gründen."],
+ ["Konfliktgespräche führen","Kapitel 2.7","Üben Sie Tatsache und Bewertung, Ich-Botschaft und das 3-B-Modell an einem eigenen Beispiel aus dem Betrieb."]
+];
+// pro Person: Thema der 1. und der 2. Frage
+const TMAP=[[0,0],[1,1],[1,1],[2,2],[3,3],[4,4],[4,5],[4,6],[4,5],[5,5],[7,7],[7,8],[8,8],[7,9],[9,9],[10,12],[11,11],[10,10],[12,12],[12,10]];
+
+/* ================= Welt ================= */
+const W=34,H=24;
+const GATES=[{z:0,cells:[[16,18],[17,18]]},{z:1,cells:[[25,11],[25,12]]},{z:2,cells:[[16,5],[17,5]]}];
+const TROPHY={x:2,y:5};
+const BUILD=[
+ {x:6,y:13,w:5,h:2,wall:"#F2E3C2",roof:"#B5443A",label:"Rathaus",door:true},
+ {x:19,y:13,w:5,h:2,wall:"#CFE3F5",roof:"#2F6FA8",label:"Elektro",door:true},
+ {x:27,y:13,w:5,h:2,wall:"#F6D6E2",roof:"#B03A6B",label:"Mode",door:true},
+ {x:19,y:1,w:5,h:2,wall:"#C9CED4",roof:"#59626C",label:"Werkhalle",door:true},
+ {x:2,y:1,w:4,h:1,wall:"#8A5A3A",roof:"#5E3B24",label:"Kaffee-Ecke",door:false}
+];
+const OBJ=[
+ // Rathausplatz
+ [8,18,"⛲"],[2,14,"🌳"],[14,14,"🌳"],[2,22,"🌲"],[14,22,"🌳"],[5,21,"🪑"],[11,22,"🌷"],[13,17,"🚲"],[3,16,"🌷"],
+ // Shoppingcenter
+ [21,19,"🏪"],[26,18,"🪴"],[18,22,"🪴"],[32,22,"🪴"],[26,21,"🛒"],[32,17,"🪑"],[18,15,"🧋"],[24,16,"🪴"],
+ // Lehrbetrieb
+ [28,2,"⚙️"],[29,2,"⚙️"],[30,2,"🔧"],[20,7,"📦"],[21,7,"📦"],[30,8,"🖥️"],[32,1,"🧯"],[23,9,"🛢️"],[28,6,"🚜"],
+ // Pausenraum
+ [5,4,"☕"],[10,3,"🥪"],[5,8,"🍎"],[11,8,"🪴"],[14,9,"🛋️"],[14,1,"🧃"],[8,1,"🪴"],[1,10,"🪴"]
+];
+function zoneOf(x,y){return y>=12?(x<=16?0:1):(x>=17?2:3)}
+const solid=new Set(), K=(x,y)=>x+","+y;
+for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  if(x===0||y===0||x===W-1||y===H-1||x===16||x===17||y===11||y===12) solid.add(K(x,y));
+}
+GATES.forEach(g=>g.cells.forEach(c=>solid.delete(K(c[0],c[1]))));
+BUILD.forEach(b=>{for(let i=0;i<b.w;i++)for(let j=0;j<b.h;j++)solid.add(K(b.x+i,b.y+j))});
+OBJ.forEach(o=>solid.add(K(o[0],o[1])));
+const npcAt=new Map(); NPCS.forEach((n,i)=>{n.id=i;npcAt.set(K(n.x,n.y),n)});
+const SKIN=["#F4C9A0","#E0A77A","#C58553","#8E5B3A","#F7D7B5"], HAIR=["#3A2A1E","#1E1E1E","#8A5A2B","#D9B45A","#B5B5B5","#7A2E2E"], SHIRT=["#D9482F","#2F7FD9","#E0A000","#8E44AD","#1E9E8A","#D9578F","#5A6B7A"];
+NPCS.forEach((n,i)=>{n.look={skin:SKIN[i%5],hair:HAIR[(i*5+2)%6],shirt:SHIRT[(i*3+1)%7],pants:"#3B4A5A"}});
+
+/* ================= Zustand ================= */
+const SAVE="rechts-navi-quest-v1";
+let G={mode:"title",x:4,y:21,dir:"up",mv:null,ans:{},player:"",streak:0,best:0,toast:"",toastT:0};
+function save(){try{localStorage.setItem(SAVE,JSON.stringify({ans:G.ans,player:G.player,x:G.x,y:G.y}))}catch(e){}}
+function load(){try{const s=JSON.parse(localStorage.getItem(SAVE)||"null");return s&&s.ans&&Object.keys(s.ans).length?s:null}catch(e){return null}}
+function clearSave(){try{localStorage.removeItem(SAVE)}catch(e){}}
+const aKey=(n,qi)=>n.id+"-"+qi;
+const npcDone=n=>n.qs.every((q,qi)=>aKey(n,qi) in G.ans);
+const zoneNPC=z=>NPCS.filter(n=>n.z===z);
+const zoneCount=z=>zoneNPC(z).filter(npcDone).length;
+const zoneDone=z=>zoneCount(z)===zoneNPC(z).length;
+const zoneScore=z=>zoneNPC(z).reduce((s,n)=>s+n.qs.filter((q,qi)=>G.ans[aKey(n,qi)]===true).length,0);
+const zoneMax=z=>zoneNPC(z).reduce((s,n)=>s+n.qs.length,0);
+const total=()=>Object.values(G.ans).filter(v=>v===true).length;
+const gateOpen=g=>zoneDone(g.z);
+function gateAt(x,y){return GATES.find(g=>g.cells.some(c=>c[0]===x&&c[1]===y))}
+function blocked(x,y){
+  if(x<0||y<0||x>=W||y>=H)return true;
+  if(solid.has(K(x,y))||npcAt.has(K(x,y)))return true;
+  if(x===TROPHY.x&&y===TROPHY.y)return true;
+  const g=gateAt(x,y); return !!(g&&!gateOpen(g));
+}
+
+/* ================= HUD ================= */
+const $=id=>document.getElementById(id);
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function drawHud(pop){
+  const st=$("stars"); st.textContent="⭐ "+total();
+  if(pop){st.classList.remove("pop");void st.offsetWidth;st.classList.add("pop")}
+  $("streak").textContent=G.streak>=3?`🔥 ${G.streak} in Serie`:"";
+  $("inv").innerHTML=PLACES.map((p,k)=>`<span class="slot ${zoneDone(k)?"full":""}" title="${zoneDone(k)?esc(p.iname):"leer"}">${zoneDone(k)?p.item:""}</span>`).join("");
+  let z=[0,1,2,3].find(k=>!zoneDone(k)), q;
+  if(z===undefined) q="Quest: Holen Sie sich den Pokal 🏆 im Pausenraum.";
+  else if(zoneOf(G.x,G.y)!==z && z>0 && !(G.y===11||G.y===12||G.x===16||G.x===17)) q=`Quest: Gehen Sie durch das offene Tor zum Ort «${PLACES[z].name}» ${PLACES[z].icon}.`;
+  else q=`Quest ${z+1} von 4: Helfen Sie allen Personen mit ❗ am Ort «${PLACES[z].name}» (${zoneCount(z)} von ${zoneNPC(z).length}).`;
+  $("quest").textContent=q;
+}
+function toast(t){G.toast=t;G.toastT=performance.now()+3500;hint()}
+
+/* ================= Zeichnen ================= */
+const cv=$("cv"),ctx=cv.getContext("2d");
+let T=40,COLS=13,ROWS=9,DPR=1;
+function resize(){
+  const w=cv.parentElement.clientWidth;
+  COLS=w<480?9:w<600?11:13; ROWS=w<480?9:9;
+  T=w/COLS; DPR=Math.min(window.devicePixelRatio||1,2);
+  cv.width=Math.round(w*DPR); cv.height=Math.round(ROWS*T*DPR);
+  cv.style.height=(ROWS*T)+"px";
+}
+window.addEventListener("resize",resize);
+function hsh(x,y){let n=(x*73856093)^(y*19349663);n=(n^(n>>>13))*1274126177;return ((n^(n>>>16))>>>0)%100}
+function R(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
+function C(x,y,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}
+function emoji(e,cx,cy,size){ctx.font=`${size}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle="#000";ctx.fillText(e,cx,cy+size*.06)}
+
+function grass(px,py,x,y){
+  R(px,py,T+1,T+1,(x+y)%2?"#7CC76C":"#76C166");
+  const h=hsh(x,y),u=T/16;
+  R(px+(h%12)*u,py+((h*7)%12)*u,u,2.5*u,"#5DAA50"); R(px+((h*3)%13)*u,py+((h*5)%11)*u,u,2*u,"#5DAA50");
+  if(h%9===0){C(px+8*u,py+9*u,1.6*u,"#FFF6C8");C(px+8*u,py+9*u,.7*u,"#F2B705")}
+}
+function cobble(px,py,x,y){
+  R(px,py,T+1,T+1,"#C9B998"); const u=T/16,o=(y%2)*4*u;
+  ctx.save();ctx.beginPath();ctx.rect(px,py,T+1,T+1);ctx.clip();
+  for(let i=-1;i<3;i++)for(let j=0;j<2;j++){ctx.fillStyle=(hsh(x*3+i,y*2+j)%3)?"#E3D6B8":"#D8C9A6";rr(px+i*8*u+o+.6*u,py+j*8*u+.6*u,6.8*u,6.8*u,1.5*u)}
+  ctx.restore();
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h);ctx.fill()}
+function floor(px,py,x,y){
+  const z=zoneOf(x,y),u=T/16;
+  if(z===0){ if((y>=15&&y<=20&&x>=4&&x<=12)||y===18&&x>12||(x>=3&&x<=5&&y>=20)) cobble(px,py,x,y); else grass(px,py,x,y); }
+  else if(z===1){ R(px,py,T+1,T+1,(x+y)%2?"#F4EFE8":"#E4DCD0"); R(px,py,T,u*.6,"#D3C9BA"); R(px,py,u*.6,T,"#D3C9BA"); }
+  else if(z===2){ R(px,py,T+1,T+1,"#B4BAC1"); const h=hsh(x,y); R(px+(h%13)*u,py+((h*3)%13)*u,u,u,"#A3A9B1"); R(px+((h*7)%13)*u,py+((h*11)%13)*u,u,u,"#C4C9CF");
+    if(y===5||x===25){R(px+(y===5?2*u:7*u),py+(y===5?7*u:2*u),y===5?12*u:2*u,y===5?2*u:12*u,"#F2C230")} }
+  else { R(px,py,T+1,T+1,"#C99A62"); for(let i=0;i<4;i++)R(px,py+i*4*u,T+1,u*.6,"#AD7F4B"); R(px+((x*5+y*3)%3)*5*u,py,u*.6,4*u,"#AD7F4B"); R(px+((x*7+y)%3)*5*u+2*u,py+8*u,u*.6,4*u,"#AD7F4B");
+    if(x>=7&&x<=11&&y>=4&&y<=7){R(px,py,T+1,T+1,"#B5443A"); if(x===7)R(px,py,3*u,T+1,"#E7C36A"); if(x===11)R(px+13*u,py,3*u+1,T+1,"#E7C36A"); if(y===4)R(px,py,T+1,3*u,"#E7C36A"); if(y===7)R(px,py+13*u,T+1,3*u+1,"#E7C36A")} }
+}
+function wallTile(px,py,x,y){
+  const u=T/16, indoor=y<=12&&!(y>=11&&false);
+  if(y<12||((y===12||y===11))){ // Backsteinmauer
+    R(px,py,T+1,T+1,"#8E5B46"); ctx.fillStyle="#A86E55";
+    for(let j=0;j<4;j++)for(let i=-1;i<2;i++){rr(px+i*8*u+((j+y)%2)*4*u+.5*u,py+j*4*u+.5*u,7*u,3*u,.6*u)}
+    R(px,py,T+1,2*u,"#6F4435");
+  } else if(x===16||x===17){ // Hecke
+    grass(px,py,x,y); C(px+4*u,py+6*u,5*u,"#2F7D4B");C(px+11*u,py+5*u,5.5*u,"#2F7D4B");C(px+8*u,py+11*u,6*u,"#2F7D4B");C(px+5*u,py+5*u,2.5*u,"#49A86E");C(px+11*u,py+9*u,2*u,"#49A86E");
+  } else { // Bäume am Rand
+    grass(px,py,x,y); R(px+7*u,py+9*u,2.4*u,6*u,"#7A5230"); C(px+8*u,py+7*u,6.5*u,"#2E8B57");C(px+5.5*u,py+5*u,3*u,"#49A86E");C(px+10.5*u,py+8.5*u,2.2*u,"#3F9E66");
+  }
+}
+function gateDraw(px,py,g,x,y,now){
+  const u=T/16; if(g.z===0)cobble(px,py,x,y); else {R(px,py,T+1,T+1,"#C9B998")}
+  if(gateOpen(g)){ R(px,py,2*u,T,"#7A5230");R(px+14*u,py,2*u,T,"#7A5230"); const p=.5+.5*Math.sin(now/300); ctx.globalAlpha=.25+.25*p; R(px+2*u,py,12*u,T,"#FFE27A"); ctx.globalAlpha=1; }
+  else { R(px,py+1*u,T+1,14*u,"#8A5A2E"); for(let i=0;i<4;i++)R(px+i*4*u+.5*u,py+1*u,3*u,14*u,"#A8743E"); R(px,py+4*u,T+1,1.5*u,"#5E3B1C");R(px,py+11*u,T+1,1.5*u,"#5E3B1C"); emoji("🔒",px+T/2,py+T/2,T*.5); }
+}
+function building(b,ox,oy){
+  const px=b.x*T-ox,py=b.y*T-oy,w=b.w*T,h=b.h*T,u=T/16;
+  R(px,py+h*.3,w,h*.7,b.wall); ctx.fillStyle=b.roof; ctx.beginPath();ctx.moveTo(px-2*u,py+h*.36);ctx.lineTo(px+4*u,py);ctx.lineTo(px+w-4*u,py);ctx.lineTo(px+w+2*u,py+h*.36);ctx.fill();
+  R(px,py+h-1.5*u,w,1.5*u,"rgba(0,0,0,.15)");
+  if(b.h>1){ const n=b.w; for(let i=0;i<n;i++){ if(b.door&&i===Math.floor(n/2))continue; const wx=px+i*T+4*u,wy=py+h*.5; R(wx,wy,8*u,7*u,"#35546B");R(wx+1*u,wy+1*u,6*u,5*u,"#9FD3EE");R(wx+3.6*u,wy,.8*u,7*u,"#35546B"); }
+    if(b.door){const dx=px+Math.floor(n/2)*T+3.5*u; R(dx,py+h-11*u,9*u,11*u,"#6B4428");R(dx+1*u,py+h-10*u,7*u,10*u,"#8C5E38");C(dx+6.5*u,py+h-5*u,.8*u,"#F2C230")} }
+  ctx.font=`800 ${Math.max(10,T*.3)}px Archivo,Arial,sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";
+  const tw=ctx.measureText(b.label).width+8*u, ly=py+(b.h>1?h*.33:h*.62);
+  ctx.fillStyle="#FFFDF5";rr(px+w/2-tw/2,ly-3.4*u,tw,6.8*u,2*u);ctx.fillStyle="#2A2A2A";ctx.fillText(b.label,px+w/2,ly+.3*u);
+}
+function person(cx,by,look,dir,step,isPlayer){
+  const u=T/16; ctx.fillStyle="rgba(0,0,0,.22)";ctx.beginPath();ctx.ellipse(cx,by-1*u,5*u,2*u,0,0,7);ctx.fill();
+  const l1=step===1?1.2*u:0,l2=step===2?1.2*u:0;
+  R(cx-3.2*u,by-5*u-l1,2.8*u,4.4*u,look.pants);R(cx+.4*u,by-5*u-l2,2.8*u,4.4*u,look.pants);
+  R(cx-3.4*u,by-1.4*u-l1,3.2*u,1.4*u,"#2A2A2A");R(cx+.2*u,by-1.4*u-l2,3.2*u,1.4*u,"#2A2A2A");
+  ctx.fillStyle=look.shirt;rr(cx-4.2*u,by-11.5*u,8.4*u,7.2*u,2*u);
+  R(cx-5.6*u,by-11*u+(step===1?.8*u:0),2*u,5*u,look.shirt);R(cx+3.6*u,by-11*u+(step===2?.8*u:0),2*u,5*u,look.shirt);
+  C(cx-4.6*u,by-5.6*u+(step===1?.8*u:0),1.1*u,look.skin);C(cx+4.6*u,by-5.6*u+(step===2?.8*u:0),1.1*u,look.skin);
+  if(isPlayer&&dir!=="up"){C(cx,by-8*u,1.7*u,"#F2C230");C(cx,by-8*u,.7*u,"#B5443A")}
+  if(isPlayer&&dir==="up"){ctx.fillStyle="#B5443A";rr(cx-3*u,by-11*u,6*u,6*u,1.5*u)}
+  C(cx,by-14.4*u,3.9*u,look.skin);
+  ctx.fillStyle=look.hair;ctx.beginPath();
+  if(dir==="up"){ctx.arc(cx,by-14.4*u,4.1*u,0,7)} else {ctx.arc(cx,by-14.8*u,4.1*u,Math.PI,0);ctx.rect(cx-4.1*u,by-15*u,8.2*u,1.2*u)}
+  ctx.fill();
+  if(isPlayer){ctx.fillStyle="#0E5C43";ctx.beginPath();ctx.arc(cx,by-15.4*u,4.3*u,Math.PI,0);ctx.fill();
+    if(dir==="down")R(cx-4.6*u,by-15.8*u,9.2*u,1.3*u,"#0A4633"); if(dir==="left")R(cx-6.4*u,by-15.8*u,5*u,1.3*u,"#0A4633"); if(dir==="right")R(cx+1.4*u,by-15.8*u,5*u,1.3*u,"#0A4633")}
+  ctx.fillStyle="#1E1E1E";
+  if(dir==="down"){C(cx-1.5*u,by-14*u,.65*u,"#1E1E1E");C(cx+1.5*u,by-14*u,.65*u,"#1E1E1E")}
+  else if(dir==="left")C(cx-2.2*u,by-14*u,.65*u,"#1E1E1E"); else if(dir==="right")C(cx+2.2*u,by-14*u,.65*u,"#1E1E1E");
+}
+function marker(cx,y,done){
+  const u=T/16; C(cx,y,3.6*u,done?"#1A7443":"#F2C230"); ctx.fillStyle=done?"#1A7443":"#F2C230";ctx.beginPath();ctx.moveTo(cx-1.6*u,y+3*u);ctx.lineTo(cx+1.6*u,y+3*u);ctx.lineTo(cx,y+5.2*u);ctx.fill();
+  ctx.font=`900 ${5.2*u}px Archivo,Arial,sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillStyle=done?"#fff":"#3A2A00";ctx.fillText(done?"✓":"!",cx,y+.3*u);
+}
+function render(now){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  let fx=G.x,fy=G.y,step=0;
+  if(G.mv){const p=Math.min(1,(now-G.mv.t0)/STEP);fx=G.mv.fx+(G.mv.tx-G.mv.fx)*p;fy=G.mv.fy+(G.mv.ty-G.mv.fy)*p;step=p<.5?1:2;if((G.mv.tx+G.mv.ty)%2)step=3-step}
+  let ox=(fx+.5)*T-COLS*T/2, oy=(fy+.5)*T-ROWS*T/2;
+  ox=Math.max(0,Math.min(W*T-COLS*T,ox)); oy=Math.max(0,Math.min(H*T-ROWS*T,oy));
+  const x0=Math.floor(ox/T),y0=Math.floor(oy/T);
+  for(let y=y0;y<=y0+ROWS&&y<H;y++)for(let x=x0;x<=x0+COLS&&x<W;x++){
+    const px=Math.floor(x*T-ox),py=Math.floor(y*T-oy),g=gateAt(x,y);
+    if(g)gateDraw(px,py,g,x,y,now);
+    else if(x===0||y===0||x===W-1||y===H-1||x===16||x===17||y===11||y===12)wallTile(px,py,x,y);
+    else floor(px,py,x,y);
+  }
+  BUILD.forEach(b=>building(b,ox,oy));
+  const ents=[];
+  OBJ.forEach(o=>ents.push({y:o[1],d:()=>{const px=o[0]*T-ox,py=o[1]*T-oy;ctx.fillStyle="rgba(0,0,0,.18)";ctx.beginPath();ctx.ellipse(px+T/2,py+T*.86,T*.36,T*.12,0,0,7);ctx.fill();emoji(o[2],px+T/2,py+T*.46,T*.86)}}));
+  const allDone=[0,1,2,3].every(zoneDone);
+  ents.push({y:TROPHY.y,d:()=>{const px=TROPHY.x*T-ox,py=TROPHY.y*T-oy,u=T/16;R(px+3*u,py+10*u,10*u,5*u,"#6B4428");R(px+2*u,py+9*u,12*u,2*u,"#8C5E38");
+    const bob=allDone?Math.sin(now/250)*1.5*u:0; if(allDone){ctx.globalAlpha=.35+.2*Math.sin(now/250);C(px+T/2,py+4*u,8*u,"#FFE27A");ctx.globalAlpha=1}
+    ctx.globalAlpha=allDone?1:.45;emoji("🏆",px+T/2,py+4*u+bob,T*.75);ctx.globalAlpha=1}});
+  NPCS.forEach(n=>ents.push({y:n.y,d:()=>{const cx=n.x*T-ox+T/2,by=n.y*T-oy+T*.95,bob=Math.sin(now/420+n.id)*T/40;
+    person(cx,by,n.look,"down",0,false); marker(cx,by-T*1.42+bob*2,npcDone(n))}}));
+  ents.push({y:fy+.01,d:()=>person(fx*T-ox+T/2,fy*T-oy+T*.95,{skin:"#F0BE94",hair:"#3A2A1E",shirt:"#F4F1E6",pants:"#2E4A7A"},G.dir,step,true)});
+  ents.sort((a,b)=>a.y-b.y).forEach(e=>e.d());
+  // Ortsname
+  const z=zoneOf(Math.round(fx),Math.round(fy)),u=T/16; ctx.font=`800 ${Math.max(11,T*.32)}px Archivo,Arial,sans-serif`;ctx.textAlign="left";ctx.textBaseline="middle";
+  const lbl=PLACES[z].name,tw=ctx.measureText(lbl).width; ctx.fillStyle="rgba(14,40,30,.78)";rr(6,6,tw+16,T*.55,8);ctx.fillStyle="#fff";ctx.fillText(lbl,14,6+T*.29);
+}
+
+/* ================= Steuerung ================= */
+const STEP=150, DIRS={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+const KEYMAP={ArrowUp:"up",ArrowDown:"down",ArrowLeft:"left",ArrowRight:"right",w:"up",s:"down",a:"left",d:"right",W:"up",S:"down",A:"left",D:"right"};
+let held=[];
+function press(d){held=held.filter(h=>h!==d);held.push(d)} function release(d){held=held.filter(h=>h!==d)}
+window.addEventListener("keydown",e=>{
+  if(G.mode==="dialog"){ dialogKey(e); return; }
+  if(G.mode!=="play")return;
+  if(KEYMAP[e.key]){press(KEYMAP[e.key]);e.preventDefault()}
+  else if(e.key===" "||e.key==="Enter"||e.key==="e"||e.key==="E"){e.preventDefault();if(!e.repeat)interact()}
+});
+window.addEventListener("keyup",e=>{if(KEYMAP[e.key])release(KEYMAP[e.key])});
+window.addEventListener("blur",()=>held=[]);
+document.querySelectorAll(".dpad button").forEach(b=>{
+  const d=b.dataset.d;
+  b.addEventListener("pointerdown",e=>{e.preventDefault();b.setPointerCapture(e.pointerId);press(d)});
+  ["pointerup","pointercancel","lostpointercapture"].forEach(ev=>b.addEventListener(ev,()=>release(d)));
+  b.addEventListener("contextmenu",e=>e.preventDefault());
+});
+$("act").addEventListener("click",()=>{if(G.mode==="play")interact()});
+cv.addEventListener("click",()=>{if(G.mode==="play")interact()});
+
+function target(){
+  const order=[G.dir,"up","right","down","left"];
+  for(const d of order){const x=G.x+DIRS[d][0],y=G.y+DIRS[d][1];
+    const n=npcAt.get(K(x,y)); if(n)return{t:"npc",n,d};
+    if(x===TROPHY.x&&y===TROPHY.y)return{t:"trophy",d};
+    const g=gateAt(x,y); if(g&&!gateOpen(g))return{t:"gate",g,d};
+  } return null;
+}
+function hint(){
+  const el=$("hint"); if(G.toast&&performance.now()<G.toastT){el.innerHTML=`${NAVI} ${esc(G.toast)}`;return} G.toast="";
+  const t=G.mv?null:target();
+  if(!t){el.innerHTML="Laufen Sie zu einer Person mit ❗ und sprechen Sie sie an.";$("act").textContent="Sprechen";return}
+  if(t.t==="npc"){el.innerHTML=npcDone(t.n)?`<b>${esc(t.n.name)}</b> haben Sie schon geholfen ✓`:`<b>Leertaste</b> oder «Sprechen»: mit <b>${esc(t.n.name)}</b> reden`;$("act").textContent="Sprechen"}
+  else if(t.t==="gate"){el.innerHTML=`🔒 Verschlossenes Tor. Helfen Sie zuerst allen Personen hier (${zoneCount(t.g.z)} von ${zoneNPC(t.g.z).length}).`;$("act").textContent="Prüfen"}
+  else {el.innerHTML=`<b>Leertaste</b>: Pokal 🏆 ansehen`;$("act").textContent="Pokal"}
+}
+function interact(){
+  if(G.mv)return; const t=target(); if(!t)return; G.dir=t.d; held=[];
+  if(t.t==="npc")talk(t.n);
+  else if(t.t==="gate")toast(`Das Tor bleibt zu. Es fehlen noch ${zoneNPC(t.g.z).length-zoneCount(t.g.z)} Personen am Ort «${PLACES[t.g.z].name}».`);
+  else if([0,1,2,3].every(zoneDone))finale(); else toast("Der Pokal gehört Ihnen erst, wenn Sie an allen vier Orten geholfen haben.");
+}
+function tick(now){
+  if(G.mode==="play"){
+    if(G.mv&&now-G.mv.t0>=STEP){G.x=G.mv.tx;G.y=G.mv.ty;G.mv=null;drawHud();hint();if((G.x+G.y)%4===0)save()}
+    if(!G.mv&&held.length){const d=held[held.length-1],nx=G.x+DIRS[d][0],ny=G.y+DIRS[d][1];
+      if(G.dir!==d){G.dir=d;hint()}
+      if(!blocked(nx,ny))G.mv={fx:G.x,fy:G.y,tx:nx,ty:ny,t0:now};}
+    if(G.toast&&now>G.toastT)hint();
+  }
+  render(now); requestAnimationFrame(tick);
+}
+
+/* ================= Dialoge ================= */
+const dlg=$("dlg"),panel=$("panel");
+function say(av,who,html,navi){return `<div class="say ${navi?"navi":""}"><span class="av" aria-hidden="true">${av}</span><div class="bub"><span class="who">${esc(who)}</span>${html}</div></div>`}
+const nav=html=>say(NAVI,"Navi",html,true);
+function open(html){G.mode="dialog";held=[];panel.innerHTML=html;dlg.classList.add("open");dlg.scrollTop=0;const f=panel.querySelector("[data-focus]");if(f)f.focus({preventScroll:true})}
+function close(){dlg.classList.remove("open");G.mode="play";drawHud();hint();save()}
+function dialogKey(e){
+  const n=parseInt(e.key,10); if(n>=1&&n<=4){const b=panel.querySelectorAll(".opt:not([disabled])")[n-1];if(b){e.preventDefault();b.click()}}
+  if("abcdABCD".includes(e.key)&&e.key.length===1&&document.activeElement.tagName!=="INPUT"){const b=panel.querySelectorAll(".opt:not([disabled])")["abcd".indexOf(e.key.toLowerCase())];if(b){e.preventDefault();b.click()}}
+}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+function talk(n){
+  if(npcDone(n)){open(`${say(n.av,n.name,`<p>Danke nochmals${G.player?", "+esc(G.player):""}! Sie haben mir schon geholfen.</p>`)}<div class="row"><button class="btn" data-focus id="x">Weitergehen</button></div>`);$("x").onclick=close;return}
+  const qi=n.qs.findIndex((q,i)=>!(aKey(n,i) in G.ans));
+  ask(n,qi,false,()=>{ if(!npcDone(n)){talk(n);return}
+    if(zoneDone(n.z))loot(n.z); else close(); });
+}
+function ask(n,qi,retry,done,meta){
+  const q=n.qs[qi], order=q.fix?q.opts.map((t,k)=>k):shuffle(q.opts.map((t,k)=>k));
+  open(`<p class="qmeta">${meta||`${PLACES[n.z].icon} ${PLACES[n.z].name}: Frage ${qi+1} von ${n.qs.length} bei ${esc(n.name.split(",")[0])}`}</p>
+    ${q.c?`<div class="scene"><b>Was passiert ist</b>${esc(q.c)}</div>`:""}
+    ${say(n.av,n.name,`<p>${esc(q.q)}</p>`)}
+    <p class="asklbl" id="qt">Was antworten Sie?</p>
+    <ul class="opts" aria-labelledby="qt">${order.map((k,i)=>`<li><button class="opt" ${i===0?"data-focus":""} data-k="${k}"><span class="k">${KEYS[i]}</span><span>${esc(q.opts[k])}</span></button></li>`).join("")}</ul>
+    <div id="fbx" aria-live="polite"></div>`);
+  let answered=false;
+  panel.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
+    if(answered)return; answered=true; const k=+b.dataset.k, ok=k===q.a;
+    if(!retry){G.ans[aKey(n,qi)]=ok; if(ok){G.streak++;G.best=Math.max(G.best,G.streak)}else G.streak=0; save()}
+    panel.querySelectorAll(".opt").forEach(o=>{const ok2=+o.dataset.k;o.disabled=true;o.classList.add(ok2===q.a?"right":ok2===k?"wrong":"dim")});
+    drawHud(ok&&!retry);
+    const thanks=ok&&!retry?`<p>${esc(n.name.split(",")[0])} bedankt sich${G.player?" bei "+esc(G.player):""}. +1 ⭐</p>`:"";
+    const st=ok&&!retry&&G.streak>=3&&G.streak%3===0?`<p>🔥 ${G.streak} richtige Antworten in Serie!</p>`:"";
+    $("fbx").innerHTML=`<div class="fb ${ok?"ok":"no"}">${nav(`<p class="verdict">${ok?pick(OK_LINES):pick(NO_LINES)}</p><p>${esc(q.why)}</p>${q.ref?`<span class="ref">Fundstelle: ${esc(q.ref)}</span>`:""}${thanks}${st}`)}</div>
+      <div class="row"><button class="btn" id="next">Weiter</button></div>`;
+    const nx=$("next"); nx.onclick=()=>done(ok); nx.focus({preventScroll:true}); $("fbx").scrollIntoView({behavior:"smooth",block:"nearest"});
+  });
+}
+function loot(z){
+  const p=PLACES[z],s=zoneScore(z),m=zoneMax(z);
+  const msg=s===m?"Perfekt, alles richtig!":s>=m-2?"Sehr gut!":s>=m/2?"Gut gemacht.":"Geschafft, aber dieses Thema sollten Sie repetieren.";
+  const nextTxt=z<3?`Das Tor zum Ort «${PLACES[z+1].name}» ${PLACES[z+1].icon} ist jetzt offen.`:"Jetzt fehlt nur noch eines: Holen Sie sich den Pokal 🏆 hier im Pausenraum!";
+  open(`<p class="qmeta">${p.icon} ${p.name} geschafft</p>
+    <div class="loot"><span class="item" aria-hidden="true">${p.item}</span><p class="iname">${esc(p.iname)}</p></div>
+    ${nav(`<p>${s} von ${m} Fragen richtig. ${msg}</p><p>${nextTxt}</p>`)}
+    <div class="row"><button class="btn" data-focus id="x">Weiter</button></div>`);
+  $("x").onclick=close;
+}
+function feedbackHTML(){
+  const st=TOPICS.map(()=>[0,0]);
+  NPCS.forEach(n=>n.qs.forEach((q,qi)=>{const t=TMAP[n.id][qi];st[t][1]++;if(G.ans[aKey(n,qi)]===true)st[t][0]++}));
+  const good=[],pot=[];
+  st.forEach((s,t)=>{if(!s[1])return;(s[0]===s[1]?good:pot).push({t,r:s[0],m:s[1]})});
+  pot.sort((a,b)=>a.r/a.m-b.r/b.m);
+  let h="";
+  h+=`<div class="fbk"><h2>💪 Das können Sie schon gut</h2>${good.length?`<ul>${good.map(o=>`<li><b>${esc(TOPICS[o.t][0])}</b><span>Alle ${o.m===1?"Fragen":o.m+" Fragen"} richtig (${TOPICS[o.t][1]})</span></li>`).join("")}</ul>`:`<p>Noch kein Thema ganz ohne Fehler. Das ist kein Problem: Unten sehen Sie genau, wo Sie ansetzen können.</p>`}</div>`;
+  h+=`<div class="fbk pot"><h2>🎯 Hier haben Sie noch Potenzial</h2>${pot.length?`<ul>${pot.map(o=>`<li><b>${esc(TOPICS[o.t][0])}</b><span><em>${o.r} von ${o.m} richtig</em>, ${TOPICS[o.t][1]} im Lehrmittel</span><span>Tipp: ${esc(TOPICS[o.t][2])}</span></li>`).join("")}</ul>`:`<p>Kein einziger Fehler. Sie sind bereit für die Prüfung.</p>`}</div>`;
+  return h;
+}
+function wrongList(){const l=[];NPCS.forEach(n=>n.qs.forEach((q,qi)=>{if(G.ans[aKey(n,qi)]===false)l.push([n,qi])}));return l}
+function finale(){
+  const tot=total(); let rank=RANKS[0]; RANKS.forEach(r=>{if(tot>=r[0])rank=r});
+  const weak=[0,1,2,3].filter(z=>zoneScore(z)<zoneMax(z)-2), wl=wrongList();
+  open(`<p class="qmeta">Quest abgeschlossen</p>
+    <p class="big">🏆 ${tot}<small> von ${TOTAL} ⭐</small></p>
+    <p class="rank">${G.player?esc(G.player)+": ":""}${rank[1]}</p>
+    ${nav(`<p>${rank[2]}</p>${G.best>=3?`<p>Längste Serie: 🔥 ${G.best}</p>`:""}`)}
+    <ul class="bars">${PLACES.map((p,z)=>{const s=zoneScore(z),m=zoneMax(z);return `<li class="${s<m-2?"weak":""}"><span class="ic" aria-hidden="true">${p.icon}</span><span class="lbl">${p.name}</span><span>${s} von ${m}</span><span class="bar"><i style="width:${Math.round(s/m*100)}%"></i></span></li>`}).join("")}</ul>
+    ${feedbackHTML()}
+    <div class="note"><p>📸 Machen Sie jetzt einen Screenshot von Ihrem Feedback. Es ist Ihr Lernplan für die Prüfung.</p></div>
+    <div class="row">${wl.length?`<button class="btn" data-focus id="rt">🔁 ${wl.length===1?"Den Fehler":"Die "+wl.length+" Fehler"} nochmals üben</button>`:""}
+      <button class="btn ghost" id="back">Zurück in die Stadt</button><button class="btn ghost" id="again">Neue Quest</button></div>`);
+  if(wl.length)$("rt").onclick=()=>retry(wl,0,0);
+  $("back").onclick=close; $("again").onclick=()=>{clearSave();titleScreen()};
+}
+function retry(list,i,right){
+  if(i>=list.length){open(`<p class="big">⭐ ${right}<small> von ${list.length} jetzt richtig</small></p>
+    ${nav(`<p>${right===list.length?"Alle Fehler ausgebügelt. Bravo!":"Zu den restlichen Fragen lohnt sich ein Blick ins Lehrmittel."}</p>`)}
+    <div class="row"><button class="btn" data-focus id="x">Zum Resultat</button></div>`);$("x").onclick=finale;return}
+  ask(list[i][0],list[i][1],true,ok=>retry(list,i+1,right+(ok?1:0)),`Fehler üben: ${i+1} von ${list.length}`);
+}
+function titleScreen(){
+  const s=load();
+  G={mode:"title",x:4,y:21,dir:"up",mv:null,ans:{},player:"",streak:0,best:0,toast:"",toastT:0}; drawHud();hint();
+  open(`<section class="title"><h1>Rechts-Navi: Die Quest</h1>
+    <p class="sub">Repetition Atelier 2 «Rechte haben – Rechte bekommen»</p>
+    ${nav(`<p>Hallo! Ich bin Navi. In dieser Stadt warten 20 Personen an vier Orten auf Ihre Hilfe. Laufen Sie zu ihnen und lösen Sie ihre Rechtsfragen.</p><p>Jeder Ort gibt einen Gegenstand und öffnet das Tor zum nächsten. Am Ende wartet der Pokal 🏆.</p>`)}
+    <div class="namebox"><label for="nm">Wie heissen Sie im Spiel?</label><input id="nm" maxlength="20" autocomplete="off" placeholder="Spielname" value="${s&&s.player?esc(s.player):""}"></div>
+    <ul class="howto"><li><kbd>←</kbd> <kbd>↑</kbd> <kbd>↓</kbd> <kbd>→</kbd> oder <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>: laufen. Auf dem Handy: Steuerkreuz.</li>
+      <li><kbd>Leertaste</kbd> oder «Sprechen»: Person ansprechen.</li><li><kbd>1</kbd> bis <kbd>4</kbd>: Antwort wählen, <kbd>Enter</kbd>: weiter.</li></ul>
+    <div class="row">${s?`<button class="btn" data-focus id="cont">Weiterspielen (${Object.keys(s.ans).length} von ${TOTAL} Fragen)</button><button class="btn ghost" id="go">Neu beginnen</button>`:`<button class="btn" id="go">Quest starten</button>`}</div></section>`);
+  const nm=()=>$("nm").value.trim();
+  $("go").onclick=()=>{clearSave();G.player=nm();close();toast("Los geht’s! Die Personen mit ❗ brauchen Ihre Hilfe.")};
+  if(s)$("cont").onclick=()=>{G.ans=s.ans;G.player=nm()||s.player||"";if(!blocked(s.x,s.y)){G.x=s.x;G.y=s.y}close()};
+  $("nm").onkeydown=e=>{if(e.key==="Enter")(s?$("cont"):$("go")).click()};
+}
+
+resize(); titleScreen(); requestAnimationFrame(tick);
+</script>
+</body>
+</html>
